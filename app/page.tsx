@@ -22,6 +22,7 @@ const RayTracing = () => {
   );
 
   const { gl } = useThree();
+
   useFrame((state) => {
     if (!mesh.current) return;
     const { clock } = state;
@@ -31,6 +32,7 @@ const RayTracing = () => {
     mesh.current.material.uniforms.u_resolution.value.x = size.x;
     mesh.current.material.uniforms.u_resolution.value.y = size.y;
   });
+
   return (
     <mesh ref={mesh}>
       <planeGeometry args={[2, 2]} />
@@ -42,6 +44,7 @@ const RayTracing = () => {
     </mesh>
   );
 };
+
 const Home = () => {
   return (
     <div style={{ width: "800px", height: "450px" }}>
