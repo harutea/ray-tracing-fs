@@ -6,7 +6,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import fragmentShader from "./shaders/ray-tracing-fragment.glsl";
 import vertexShader from "./shaders/ray-tracing-vertex.glsl";
 
-const Wave = () => {
+const RayTracing = () => {
   const mesh = useRef();
 
   const uniforms = useMemo(
@@ -42,14 +42,14 @@ const Wave = () => {
     </mesh>
   );
 };
-const BackgroundAnimation = () => {
+const Home = () => {
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <Canvas>
-        <Wave />
+        <RayTracing />
       </Canvas>
     </div>
   );
 };
 
-export default BackgroundAnimation;
+export default Home;
