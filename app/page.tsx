@@ -44,7 +44,7 @@ const RayTracing = () => {
 };
 const Home = () => {
   return (
-    <div style={{ width: "100vw", height: "100vh" }}>
+    <div style={{ width: "800px", height: "450px" }}>
       <Canvas>
         <RayTracing />
       </Canvas>
