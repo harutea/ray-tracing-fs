@@ -1,0 +1,43 @@
+{
+  "name": "ray-tracing-fs",
+  "version": "1.0.0",
+  "description": "Ray Tracing in Fragment Shader",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harutea/ray-tracing-fs.git"
+  },
+  "keywords": [],
+  "author": "Kihun Jang",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/harutea/ray-tracing-fs/issues"
+  },
+  "homepage": "https://github.com/harutea/ray-tracing-fs#readme",
+  "dependencies": {
+    "@react-three/drei": "^9.93.0",
+    "@react-three/fiber": "^8.15.13",
+    "@types/three": "^0.160.0",
+    "eslint-plugin-prettier": "^5.1.2",
+    "next": "^14.0.4",
+    "raw-loader": "^4.0.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.10.7",
+    "@types/react": "18.2.47",
+    "eslint": "8.56.0",
+    "eslint-config-next": "14.0.4",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "3.1.1",
+    "typescript": "5.3.3"
+  }
+}
