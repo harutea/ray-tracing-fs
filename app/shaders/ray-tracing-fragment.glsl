@@ -107,30 +107,39 @@ vec3 ray_color(Ray ray) {
   return (1.0-a)*vec3(1.0, 1.0, 1.0) + a*vec3(0.5, 0.7, 1.0);
 }
 
+struct Camera {
+  float aspect_ratio;
+  vec3 center;
+  vec3 pixel_lower_left;
+  vec3 pixel_delta_u;
+  vec3 pixel_delta_v;
+};
 
-void main() {
-  float aspect_ratio = 16.0 / 9.0;
+void initialize(inout Camera camera) {
+  camera.aspect_ratio = 16.0 / 9.0;
 
-  // camera
   float focal_length = 1.0;
   float viewport_height = 2.0;
   float viewport_width = viewport_height / (u_resolution.y/u_resolution.x);
-  vec3 camera_center = vec3(0.0, 0.0, 0.0);
+  camera.center = vec3(0.0, 0.0, 0.0);
 
   vec3 viewport_u = vec3(viewport_width, 0.0, 0.0);
   vec3 viewport_v = vec3(0.0, viewport_height, 0.0);
 
-  vec3 pixel_delta_u = viewport_u / u_resolution.x;
-  vec3 pixel_delta_v = viewport_v / u_resolution.y;
+  camera.pixel_delta_u = viewport_u / u_resolution.x;
+  camera.pixel_delta_v = viewport_v / u_resolution.y;
 
-  vec3 viewport_lower_left = camera_center - vec3(0.0, 0.0, focal_length) - viewport_u/2.0 - viewport_v/2.0;
-  vec3 pixel00_loc = viewport_lower_left + 0.5 * (pixel_delta_u + pixel_delta_v);
+  vec3 viewport_lower_left = camera.center - vec3(0.0, 0.0, focal_length) - viewport_u/2.0 - viewport_v/2.0;
+  camera.pixel_lower_left = viewport_lower_left + 0.5 * (camera.pixel_delta_u + camera.pixel_delta_v);
+}
 
-  // vec2 st = gl_FragCoord.xy / u_resolution.xy;
+void main() {
+  Camera camera;
+  initialize(camera);
 
-  vec3 pixel_center = pixel00_loc + (gl_FragCoord.x * pixel_delta_u) + (gl_FragCoord.y * pixel_delta_v);
-  vec3 ray_direction = pixel_center - camera_center;
-  Ray ray = Ray(camera_center, ray_direction);
+  vec3 pixel_center = camera.pixel_lower_left + (gl_FragCoord.x * camera.pixel_delta_u) + (gl_FragCoord.y * camera.pixel_delta_v);
+  vec3 ray_direction = pixel_center - camera.center;
+  Ray ray = Ray(camera.center, ray_direction);
 
   vec3 pixel_color = ray_color(ray);
   gl_FragColor = vec4(pixel_color, 1.0);
