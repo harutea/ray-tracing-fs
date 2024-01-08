@@ -30,11 +30,26 @@ struct Triangle {
   vec3 p3;
 };
 
+struct Interval {
+  float min, max;
+};
+
+bool interval_contains(Interval interval, float x) {
+  return x >= interval.min && x <= interval.max;
+}
+
+bool interval_surrounds(Interval interval, float x) {
+  return x > interval.min && x < interval.max;
+}
+
+Interval empty = Interval(+infinity, -infinity);
+Interval universe = Interval(-infinity, +infinity);
+
 vec3 ray_at(Ray ray, float t) {
   return ray.origin + t*ray.direction;
 }
 
-bool ray_sphere_intersection(Ray ray, float ray_tmin, float ray_tmax, Sphere s, inout IntersectionRecord record) {
+bool ray_sphere_intersection(Ray ray, Interval ray_t, Sphere s, inout IntersectionRecord record) {
   vec3 co = ray.origin - s.center;
   float a = dot(ray.direction, ray.direction);
   float half_b = dot(co, ray.direction);
@@ -47,9 +62,9 @@ bool ray_sphere_intersection(Ray ray, float ray_tmin, float ray_tmax, Sphere s, 
   float sqrtd = sqrt(discriminant);
 
   float root = (-half_b - sqrtd) / a;
-  if (root <= ray_tmin || root >= ray_tmax) {
+  if (!interval_surrounds(ray_t, root)) {
     root = (-half_b + sqrtd) / a;
-    if (root <= ray_tmin || root >= ray_tmax)
+    if (!interval_surrounds(ray_t, root))
       return false;
   }
 
@@ -70,17 +85,18 @@ vec3 ray_color(Ray ray) {
   IntersectionRecord record;
   IntersectionRecord rec_temp;
   bool intersect_something = false;
-  float closest_so_far = infinity;
+  float closest = infinity;
   
   for (int i=0; i<sphere_list.length(); i++) {
-    bool intersect = ray_sphere_intersection(ray, 0.0, closest_so_far, sphere_list[i], rec_temp);
+    bool intersect = ray_sphere_intersection(ray, Interval(0.0, closest), sphere_list[i], rec_temp);
     
     if(intersect) {
       intersect_something = true;
-      closest_so_far = rec_temp.t;
+      closest = rec_temp.t;
       record = rec_temp;
     }
   }
+
   if(intersect_something) {
       return 0.5 * (record.normal + vec3(1.0, 1.0, 1.0));
   }
