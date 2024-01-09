@@ -1,15 +1,15 @@
 uniform vec2 u_resolution;
 uniform float u_time;
 
-const float infinity = 1000000.0;
+const float infinity = 10000000.0;
 const float pi = 3.14159265;
 
 // utility
 
-float variation = 0.0001;
+float variation = 0.00001;
 float rand(vec2 co){
-    variation += 0.0001;
-    return fract(sin(dot(co, vec2(12.9898+variation, 78.2330+variation))) * 43758.5453);
+    variation += 0.00001;
+    return fract(sin(dot(co, vec2(12.9898+variation, 78.233+variation))) * 43758.5453);
 }
 
 float rand(vec2 co, float min, float max) {
@@ -44,9 +44,12 @@ vec3 random_on_hemisphere(vec2 co, vec3 normal) {
     return -on_unit_sphere;
 }
 
-
 float degrees_to_radians(float degrees) {
   return degrees * pi / 180.0;
+}
+
+float linear_to_gamma(float linear_component) {
+  return sqrt(linear_component);
 }
 
 struct Interval {
@@ -220,6 +223,9 @@ void main() {
   float cx = interval_clamp(intensity, pixel_color.x * scale);
   float cy = interval_clamp(intensity, pixel_color.y * scale);
   float cz = interval_clamp(intensity, pixel_color.z * scale);
+  cx = linear_to_gamma(cx);
+  cy = linear_to_gamma(cy);
+  cz = linear_to_gamma(cz);
   pixel_color = vec3(cx, cy, cz);
   gl_FragColor = vec4(pixel_color, 1.0);
 }
