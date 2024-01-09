@@ -6,6 +6,10 @@ const float PI = 3.14159265;
 const int MAX_DEPTH = 50;
 const int SAMPLES_PER_PIXEL = 100;
 
+const int MATERIAL_LAMBERTIAN = 0;
+const int MATERIAL_METAL = 1;
+
+
 // Utility
 
 float variation = 0.00001;
@@ -94,10 +98,11 @@ vec3 ray_at(Ray ray, float t) {
 
 
 // Material
-
+// type - 0 : Lambertian, 1: Metal
 struct Material {
   int type;
   vec3 albedo;
+  float fuzz; // for Metal
 };
 
 
@@ -165,7 +170,7 @@ struct Triangle {
 
 bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec3 attenuation, inout Ray scattered) {
   
-  if (material.type == 0) {
+  if (material.type == MATERIAL_LAMBERTIAN) {
 
     // Lambertian
     vec3 scatter_direction = record.normal + random_unit_vector(vec2(gl_FragCoord.xy));
@@ -175,13 +180,13 @@ bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec
     attenuation = material.albedo;
     return true;
 
-  } else if (material.type == 1) {
+  } else if (material.type == MATERIAL_METAL) {
 
     // Metal
     vec3 reflected = reflect(normalize(ray_in.direction), record.normal);
-    scattered = Ray(record.pos, reflected);
+    scattered = Ray(record.pos, reflected + material.fuzz*random_unit_vector(vec2(gl_FragCoord.xy)));
     attenuation = material.albedo;
-    return true;
+    return (dot(scattered.direction, record.normal) > 0.0);
 
   }
   
@@ -197,10 +202,10 @@ vec3 ray_color(Ray ray) {
 
   // world
   Sphere[] sphere_list = Sphere[](
-    Sphere(vec3(0.0, 0.0, -1.0), 0.5, Material(0, vec3(0.7, 0.3, 0.3))),
-    Sphere(vec3(0.0, -100.5, -1.0), 100.0, Material(0, vec3(0.8, 0.8, 0.0))),
-    Sphere(vec3(-1.0, 0.0, -1.0), 0.5, Material(1, vec3(0.8, 0.8, 0.8))),
-    Sphere(vec3(1.0, 0.0, -1.0), 0.5, Material(1, vec3(0.8, 0.6, 0.2)))
+    Sphere(vec3(0.0, 0.6 * sin(u_time * 2.0) + 0.6, -1.0), 0.5, Material(MATERIAL_LAMBERTIAN, vec3(0.7, 0.3, 0.3), 1.0)),
+    Sphere(vec3(0.0, -100.5, -1.0), 100.0, Material(MATERIAL_LAMBERTIAN, vec3(0.8, 0.8, 0.0), 1.0)),
+    Sphere(vec3(-1.0, 0.0, -1.0), 0.5, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.3)),
+    Sphere(vec3(1.0, 0.3 * sin(u_time * 2.0 + 1.0), -1.0), 0.2, Material(MATERIAL_METAL, vec3(0.2, 0.6, 0.8), 1.0))
   );
 
   vec3 unit_direction = normalize(ray.direction);
