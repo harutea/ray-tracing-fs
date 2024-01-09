@@ -202,8 +202,8 @@ vec3 ray_color(Ray ray) {
 
   // world
   Sphere[] sphere_list = Sphere[](
-    Sphere(vec3(0.0, 0.6 * sin(u_time * 2.0) + 0.6, -1.0), 0.5, Material(MATERIAL_LAMBERTIAN, vec3(0.7, 0.3, 0.3), 1.0)),
-    Sphere(vec3(0.0, -100.5, -1.0), 100.0, Material(MATERIAL_LAMBERTIAN, vec3(0.8, 0.8, 0.0), 1.0)),
+    Sphere(vec3(0.0, 0.6 * sin(u_time * 2.0) + 0.6, -1.0), 0.5, Material(MATERIAL_LAMBERTIAN, vec3(0.7, 0.3, 0.3), 0.0)),
+    Sphere(vec3(0.0, -100.5, -1.0), 100.0, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.0)),
     Sphere(vec3(-1.0, 0.0, -1.0), 0.5, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.3)),
     Sphere(vec3(1.0, 0.3 * sin(u_time * 2.0 + 1.0), -1.0), 0.2, Material(MATERIAL_METAL, vec3(0.2, 0.6, 0.8), 1.0))
   );
