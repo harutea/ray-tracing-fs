@@ -6,12 +6,22 @@ const float pi = 3.14159265;
 
 // utility
 
+float variation = 0.001;
 float rand(vec2 co){
-    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+    variation += 0.001;
+    return fract(sin(dot(co, vec2(12.9898+variation, 78.233+variation))) * 43758.5453);
 }
 
 float rand(vec2 co, float min, float max) {
   return min + (max-min)*rand(co);
+}
+
+vec3 rand_vec3(vec2 co) {
+  return vec3(rand(co), rand(co), rand(co));
+}
+
+vec3 rand_vec3(vec2 co, float min, float max) {
+  return vec3(rand(co, min, max), rand(co, min, max), rand(co, min, max));
 }
 
 float degrees_to_radians(float degrees) {
@@ -152,8 +162,8 @@ void init(inout Camera camera) {
 }
 
 vec3 pixel_sample_square(Camera camera) {
-  float px = -0.5 + rand(vec2(gl_FragCoord.x, gl_FragCoord.y));
-  float py = 0.5 + rand(vec2(gl_FragCoord.x, gl_FragCoord.y));
+  float px = -0.5 + rand(vec2(gl_FragCoord.xy));
+  float py = -0.5 + rand(vec2(gl_FragCoord.xy));
   return (px * camera.pixel_delta_u) + (py * camera.pixel_delta_v);
 }
 
