@@ -3,8 +3,8 @@
 import { useRef, useLayoutEffect, useContext, useMemo } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import fragmentShader from "./shaders/ray-tracing-fragment.glsl";
-import vertexShader from "./shaders/ray-tracing-vertex.glsl";
+import fragmentShader from "../shaders/ray-tracing-fragment.glsl";
+import vertexShader from "../shaders/ray-tracing-vertex.glsl";
 
 const RayTracing = () => {
   const mesh = useRef();
