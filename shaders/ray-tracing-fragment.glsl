@@ -10,57 +10,60 @@ const float INFINITY = 10000000.0;
 const float PI = 3.14159265;
 const int MAX_DEPTH = 50;
 const int SAMPLES_PER_PIXEL = 30;
-
+const vec3 GROUND_COLOR = vec3(0.6, 0.6, 0.8);
+const float LIGHT_SOURCE_RADIUS = 0.2;
 
 // Meterial Types
 
 const int MATERIAL_LAMBERTIAN = 0;
 const int MATERIAL_METAL = 1;
 const int MATERIAL_DIELECTRIC = 2;
+const int MATERIAL_LIGHT = 3;
 
 
 // Utility
 
 float variation = 0.00001;
-float rand(vec2 co){
+float rand(){
     variation += 0.00001;
+    vec2 co = vec2(gl_FragCoord.xy);
     return fract(sin(dot(co, vec2(12.9898+variation, 78.233+variation))) * 43758.5453);
 }
 
-float rand(vec2 co, float min, float max) {
-  return min + (max-min)*rand(co);
+float rand(float min, float max) {
+  return min + (max-min)*rand();
 }
 
-vec3 rand_vec3(vec2 co) {
-  return vec3(rand(co), rand(co), rand(co));
+vec3 rand_vec3() {
+  return vec3(rand(), rand(), rand());
 }
 
-vec3 rand_vec3(vec2 co, float min, float max) {
-  return vec3(rand(co, min, max), rand(co, min, max), rand(co, min, max));
+vec3 rand_vec3(float min, float max) {
+  return vec3(rand(min, max), rand(min, max), rand(min, max));
 }
 
-vec3 random_in_unit_sphere(vec2 co) {
+vec3 random_in_unit_sphere() {
   while (true) {
-    vec3 p = rand_vec3(co, -1.0, 1.0);
+    vec3 p = rand_vec3(-1.0, 1.0);
     if(length(p) < 1.0)
       return p;
   }
 }
 
-vec3 random_in_unit_disk(vec2 co) {
+vec3 random_in_unit_disk() {
   while (true) {
-    vec3 p = vec3(rand(co, -1.0, 1.0), rand(co, -1.0, 1.0), 0.0);
+    vec3 p = vec3(rand(-1.0, 1.0), rand(-1.0, 1.0), 0.0);
     if(length(p) < 1.0)
       return p;
   }
 }
 
-vec3 random_unit_vector(vec2 co) {
-  return normalize(random_in_unit_sphere(co));
+vec3 random_unit_vector() {
+  return normalize(random_in_unit_sphere());
 }
 
-vec3 random_on_hemisphere(vec2 co, vec3 normal) {
-  vec3 on_unit_sphere = random_unit_vector(co);
+vec3 random_on_hemisphere(vec3 normal) {
+  vec3 on_unit_sphere = random_unit_vector();
   if (dot(on_unit_sphere, normal) > 0.0)
     return on_unit_sphere;
   else
@@ -192,16 +195,95 @@ struct Triangle {
   vec3 p1;
   vec3 p2;
   vec3 p3;
+  Material material;
 };
 
+bool ray_triangle_intersection(Ray ray, Interval ray_t, Triangle tri, inout IntersectionRecord record) {
+  
+  const epsilon = 0.000001;
+
+
+  // compute the triangle normal
+
+  vec3 p0p1 = p1 - p0;
+  vec3 p0p2 = p2 - p0;
+  vec3 normal = cross(p0p1, p0p2);
+  
+
+  // check if the ray and triangle are parallel
+
+  float dot_n_raydir = dot(normal, ray.direction);
+  if(abs(dot_n_raydir) < epsilon)
+    return false;
+
+
+  // find p (the intersection point)
+
+  float d = dot(-n, p0);
+
+  float t = -(dot(n, ray.origin) + d) / dot_n_raydir;
+
+  if ( t < 0 )
+    return false;
+
+  vec3 p = ray_at(ray, t);
+
+
+  // test p is inside or outside triangle
+
+  vec3 c;
+
+  c = cross(v1-v0, p-v0);
+  if (dot(normal, c) < 0)
+    return false;
+  
+  c = cross(v2-v1, p-v1);
+  if (dot(normal, c) < 0)
+    return false;
+  
+  c = cross(v0-v2, p-v2);
+  if (dot(normal, c) < 0)
+    return false;
+  
+
+  record.t = t;
+  record.pos = p;
+  vec3 outward_normal = normal;
+  set_intersected_face_normal(record, ray, outward_normal);
+  record.material = tri.material;
+  return true;
+}
+
+struct Tetrahedron {
+  vec3 p1;
+  vec3 p2;
+  vec3 p3;
+  vec3 p4;
+  Material material;
+}
+
+bool ray_tetrahedron_intersection(Ray ray, Interval ray_t, Tetrahedron tet, inout IntersectionRecord record) {
+  
+  vec3 outward_normal = vec3(0, 0, 0);
+  set_intersected_face_normal(record, ray, outward_normal);
+  return true;
+}
 
 // Scatter Ray
 
-bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec3 attenuation, inout Ray scattered) {
+bool scatter(Material material, vec3 light_pos, Ray ray_in, IntersectionRecord record, inout vec3 attenuation, inout Ray scattered) {
   
   if (material.type == MATERIAL_LAMBERTIAN) {
 
-    vec3 scatter_direction = record.normal + random_unit_vector(vec2(gl_FragCoord.xy));
+    if(rand() < 0.04) {
+      // to light source
+      vec3 scatter_direction = light_pos - record.pos + LIGHT_SOURCE_RADIUS*random_in_unit_sphere();
+      scattered = Ray(record.pos, scatter_direction);
+      attenuation = 0.5 * material.albedo;
+      return true;
+    }
+
+    vec3 scatter_direction = record.normal + random_unit_vector();
     if(near_zero(scatter_direction))
       scatter_direction = record.normal;
     scattered = Ray(record.pos, scatter_direction);
@@ -210,12 +292,28 @@ bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec
 
   } else if (material.type == MATERIAL_METAL) {
 
+    if(rand() < 0.04) {
+      // to light source
+      vec3 scatter_direction = light_pos - record.pos + LIGHT_SOURCE_RADIUS*random_in_unit_sphere();
+      scattered = Ray(record.pos, scatter_direction);
+      attenuation = 0.5 * material.albedo;
+      return true;
+    }
+
     vec3 reflected = reflect(normalize(ray_in.direction), record.normal);
-    scattered = Ray(record.pos, reflected + material.fuzz*random_unit_vector(vec2(gl_FragCoord.xy)));
+    scattered = Ray(record.pos, reflected + material.fuzz*random_unit_vector());
     attenuation = material.albedo;
     return (dot(scattered.direction, record.normal) > 0.0);
 
   } else if (material.type == MATERIAL_DIELECTRIC) {
+
+    if(rand() < 0.04) {
+      // to light source
+      vec3 scatter_direction = light_pos - record.pos + LIGHT_SOURCE_RADIUS*random_in_unit_sphere();
+      scattered = Ray(record.pos, scatter_direction);
+      attenuation = 0.5 * material.albedo;
+      return true;
+    }
 
     attenuation = vec3(1.0, 1.0, 1.0);
     float refraction_ratio = record.front_face ? (1.0/material.ir) : material.ir;
@@ -227,7 +325,7 @@ bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec
     bool cannot_refract = refraction_ratio * sin_theta > 1.0;
     vec3 direction;
 
-    if(cannot_refract || reflectance(cos_theta, refraction_ratio) > rand(vec2(gl_FragCoord.xy)))
+    if(cannot_refract || reflectance(cos_theta, refraction_ratio) > rand())
       direction = reflect(unit_direction, record.normal);
     else
       direction = refract(unit_direction, record.normal, refraction_ratio);
@@ -236,9 +334,21 @@ bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec
     return true;
 
   }
-  
+  else if (material.type == MATERIAL_LIGHT) {
+    return false;
+  }
+
   return false;
 
+}
+
+vec3 emit(Material material) {
+  if(material.type == MATERIAL_LIGHT) {
+    return vec3(1.0, 1.0, 1.0);
+  }
+  else {
+    return vec3(0.0, 0.0, 0.0);
+  }
 }
 
 
@@ -247,19 +357,32 @@ bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec
 vec3 ray_color(Ray ray) {
   int max_depth = MAX_DEPTH;
 
-  float R = cos(PI/4.0);
-
   // World
+  vec3 light_pos = vec3(4.0 * sin(u_time * 0.5), 3.0, 4.0 * cos(u_time * 0.5));
+  
   Sphere[] sphere_list = Sphere[](
-    Sphere(vec3(0.0, -100.5, 0.0), 100.0, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.1, 1.0)),
-    Sphere(vec3(-R, 0.0, 10.0*sin(u_time)), R, Material(MATERIAL_LAMBERTIAN, vec3(0.7, 0.3, 0.3), 0.0, 1.0)),
-    Sphere(vec3(0.0, 0.0, sin(u_time)), 0.1, Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.3, 1.5)),
-    Sphere(vec3(3.0 * sin(u_time), 2.0, 3.0 * cos(u_time)), 0.2, Material(MATERIAL_METAL, vec3(0.2, 0.6, 0.8), 0.0, 1.0))
+    Sphere(vec3(0.0, -100.2, 0.0), 100.0, Material(MATERIAL_LAMBERTIAN, GROUND_COLOR, 0.1, 1.0)),
+    Sphere(light_pos, LIGHT_SOURCE_RADIUS, Material(MATERIAL_LIGHT, vec3(0.2, 0.6, 0.8), 0.0, 1.0)),
+    Sphere(vec3(-1.2, 0.5, -1.2), 0.7, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.0, 1.0)),
+    Sphere(vec3(-2.2, 0.0, -2.0), 0.2, Material(MATERIAL_LAMBERTIAN, vec3(1.0, 0.8, 0.8), 0.0, 1.0)),
+    Sphere(vec3(0.1, 0.0, 1.6), 0.2, Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.3, 1.5)),
+    Sphere(vec3(2.2, 0.0, -1.3), 0.2, Material(MATERIAL_LAMBERTIAN, vec3(0.5, 0.5, 1.0), 0.1, 1.5)),
+    Sphere(vec3(1.7, 0.0, -0.3), 0.2, Material(MATERIAL_METAL, vec3(1.0, 0.5, 0.5), 0.4, 1.5)),
+    Sphere(vec3(2.2, 0.0, 2.3), 0.2, Material(MATERIAL_METAL, vec3(0.3, 0.8, 0.8), 0.2, 1.5))
+  );
+
+  Tetrahedron[] tet_list = Tetrahedron[](
+    Tetrahedron(vec3(0.0, 0.5 * sqrt(3), 0.25 * 1.0 / sqrt(3)),
+                vec3(0.5, 0.0, 0.0),
+                vec3(-0.5, 0.0, 0.0),
+                vec3(0.0, 0.0, 1.0 - 0.25 * 1.0 / sqrt(3)),
+                Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.0, 1.5)
+                )
   );
 
   vec3 unit_direction = normalize(ray.direction);
   float a = 0.5*(unit_direction.y + 1.0);
-  vec3 final_color = (1.0-a)*vec3(1.0, 1.0, 1.0) + a*vec3(0.5, 0.7, 1.0);
+  vec3 final_color = (1.0-a)*vec3(1.0, 1.0, 1.0) + a*vec3(0.5, 0.8, 1.0);
 
   Ray ray_curr = ray;
   int curr_depth = 0;
@@ -287,10 +410,12 @@ vec3 ray_color(Ray ray) {
         
     Ray scattered;
     vec3 attenuation;
-    bool is_scattered = scatter(record.material, ray_curr, record, attenuation, scattered);
+    vec3 emission_color = emit(record.material);
+    bool is_scattered = scatter(record.material, light_pos, ray_curr, record, attenuation, scattered);
 
-    if(!is_scattered)
-      return vec3(0.0, 0.0, 0.0);
+    if(!is_scattered) {
+      return emission_color;
+    }
 
     ray_curr = scattered;
     final_color = attenuation * final_color;
@@ -329,14 +454,14 @@ void init(inout Camera camera) {
   camera.aspect_ratio = float(u_resolution.y)/float(u_resolution.x);
   camera.samples_per_pixel = SAMPLES_PER_PIXEL;
 
-  camera.vfov = degrees_to_radians(30.0 + u_mousewheel);
+  camera.vfov = degrees_to_radians(20.0 + 0.5 * u_mousewheel);
   
-  camera.look_from = vec3(3.0, 0.0, 0.0);
+  camera.look_from = vec3(9.0, 2.0, 2.0);
   camera.look_at = vec3(0.0, 0.0, 0.0);
   camera.vup = vec3(0, 1, 0);
 
-  camera.defocus_angle = 5.0;
-  camera.focus_dist = 3.0;
+  camera.defocus_angle = 1.0;
+  camera.focus_dist = 9.0 + 2.0 * u_keymove.y;
 
 
   //  Rotate camera with mouse pointer
@@ -358,7 +483,9 @@ void init(inout Camera camera) {
   camera.pixel_delta_u = viewport_u / u_resolution.x;
   camera.pixel_delta_v = viewport_v / u_resolution.y;
 
-  vec3 viewport_lower_left = camera.center - (camera.focus_dist * camera.w) - viewport_u/2.0 - viewport_v/2.0;
+  vec3 viewport_lower_left = camera.center - (camera.focus_dist * camera.w) - viewport_u/2.0 - viewport_v/2.0
+                            - viewport_u*0.12; // the last term is error correction
+
   camera.pixel_lower_left = viewport_lower_left + 0.5 * (camera.pixel_delta_u + camera.pixel_delta_v);
 
   float defocus_radius = camera.focus_dist * tan(degrees_to_radians(camera.defocus_angle)/2.0);
@@ -367,13 +494,13 @@ void init(inout Camera camera) {
 }
 
 vec3 pixel_sample_square(Camera camera) {
-  float px = -0.5 + rand(vec2(gl_FragCoord.xy));
-  float py = -0.5 + rand(vec2(gl_FragCoord.xy));
+  float px = -0.5 + rand();
+  float py = -0.5 + rand();
   return (px * camera.pixel_delta_u) + (py * camera.pixel_delta_v);
 }
 
 vec3 defocus_disk_sample(Camera camera) {
-  vec3 p = random_in_unit_disk(vec2(gl_FragCoord.xy));
+  vec3 p = random_in_unit_disk();
   return camera.center + (p.x * camera.defocus_disk_u) + (p.y * camera.defocus_disk_v);
 }
 

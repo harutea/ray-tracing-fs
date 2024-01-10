@@ -93,7 +93,7 @@ const Home = () => {
 
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
-      <div style={{ width: "800px", height: "450px" }}>
+      <div style={{ width: "700px", height: "700px" }}>
         <Canvas
           onWheel={onWheel}
           onPointerMove={onPointerMove}
