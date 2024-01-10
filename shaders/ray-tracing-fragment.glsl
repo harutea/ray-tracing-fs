@@ -8,6 +8,7 @@ const int SAMPLES_PER_PIXEL = 100;
 
 const int MATERIAL_LAMBERTIAN = 0;
 const int MATERIAL_METAL = 1;
+const int MATERIAL_DIELECTRIC = 2;
 
 
 // Utility
@@ -98,13 +99,19 @@ vec3 ray_at(Ray ray, float t) {
 
 
 // Material
-// type - 0 : Lambertian, 1: Metal
 struct Material {
   int type;
   vec3 albedo;
   float fuzz; // for Metal
+  float ir; // Index of Refraction for Dielectric
 };
 
+float reflectance(float cosine, float ref_index) {
+  // Schlick's approximation
+  float r0 = (1.0 - ref_index) / (1.0 + ref_index);
+  r0 = r0 * r0;
+  return r0 + (1.0-r0) * pow((1.0 - cosine), 5.0);
+}
 
 // Intersection Record
 
@@ -172,7 +179,6 @@ bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec
   
   if (material.type == MATERIAL_LAMBERTIAN) {
 
-    // Lambertian
     vec3 scatter_direction = record.normal + random_unit_vector(vec2(gl_FragCoord.xy));
     if(near_zero(scatter_direction))
       scatter_direction = record.normal;
@@ -182,11 +188,30 @@ bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec
 
   } else if (material.type == MATERIAL_METAL) {
 
-    // Metal
     vec3 reflected = reflect(normalize(ray_in.direction), record.normal);
     scattered = Ray(record.pos, reflected + material.fuzz*random_unit_vector(vec2(gl_FragCoord.xy)));
     attenuation = material.albedo;
     return (dot(scattered.direction, record.normal) > 0.0);
+
+  } else if (material.type == MATERIAL_DIELECTRIC) {
+
+    attenuation = vec3(1.0, 1.0, 1.0);
+    float refraction_ratio = record.front_face ? (1.0/material.ir) : material.ir;
+
+    vec3 unit_direction = normalize(ray_in.direction);
+    float cos_theta = min(dot(-unit_direction, record.normal), 1.0);
+    float sin_theta = sqrt(1.0 - cos_theta*cos_theta);
+
+    bool cannot_refract = refraction_ratio * sin_theta > 1.0;
+    vec3 direction;
+
+    if(cannot_refract || reflectance(cos_theta, refraction_ratio) > rand(vec2(gl_FragCoord.xy)))
+      direction = reflect(unit_direction, record.normal);
+    else
+      direction = refract(unit_direction, record.normal, refraction_ratio);
+
+    scattered = Ray(record.pos, direction);
+    return true;
 
   }
   
@@ -200,12 +225,12 @@ bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec
 vec3 ray_color(Ray ray) {
   int max_depth = MAX_DEPTH;
 
-  // world
+  // World
   Sphere[] sphere_list = Sphere[](
-    Sphere(vec3(0.0, 0.6 * sin(u_time * 2.0) + 0.6, -1.0), 0.5, Material(MATERIAL_LAMBERTIAN, vec3(0.7, 0.3, 0.3), 0.0)),
-    Sphere(vec3(0.0, -100.5, -1.0), 100.0, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.0)),
-    Sphere(vec3(-1.0, 0.0, -1.0), 0.5, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.3)),
-    Sphere(vec3(1.0, 0.3 * sin(u_time * 2.0 + 1.0), -1.0), 0.2, Material(MATERIAL_METAL, vec3(0.2, 0.6, 0.8), 1.0))
+    Sphere(vec3(0.0, 0.6 * sin(u_time * 2.0) + 0.6, -1.0), 0.5, Material(MATERIAL_LAMBERTIAN, vec3(0.7, 0.3, 0.3), 0.0, 1.0)),
+    Sphere(vec3(0.0, -100.5, -1.0), 100.0, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.3, 1.0)),
+    Sphere(vec3(-1.0, 0.0, -1.0), -0.5, Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.3, 1.5)),
+    Sphere(vec3(1.0, 0.3 * sin(u_time * 2.0 + 1.0), -1.0), 0.2, Material(MATERIAL_METAL, vec3(0.2, 0.6, 0.8), 1.0, 1.0))
   );
 
   vec3 unit_direction = normalize(ray.direction);
