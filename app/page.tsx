@@ -70,7 +70,6 @@ const Home = () => {
 
   const onWheel = (e) => {
     mouseWheel.current += e.deltaY;
-    console.log(e.deltaY);
   };
 
   const onPointerDown = (e) => {
@@ -90,7 +89,6 @@ const Home = () => {
 
     diffX.current = e.clientX - startX.current;
     diffY.current = e.clientY - startY.current;
-    console.log(diffX.current, diffY.current);
   };
 
   return (

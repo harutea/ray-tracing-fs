@@ -47,6 +47,14 @@ vec3 random_in_unit_sphere(vec2 co) {
   }
 }
 
+vec3 random_in_unit_disk(vec2 co) {
+  while (true) {
+    vec3 p = vec3(rand(co, -1.0, 1.0), rand(co, -1.0, 1.0), 0.0);
+    if(length(p) < 1.0)
+      return p;
+  }
+}
+
 vec3 random_unit_vector(vec2 co) {
   return normalize(random_in_unit_sphere(co));
 }
@@ -243,10 +251,10 @@ vec3 ray_color(Ray ray) {
 
   // World
   Sphere[] sphere_list = Sphere[](
-    Sphere(vec3(0.0, -100.5, -1.0), 100.0, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.3, 1.0)),
-    Sphere(vec3(-R, 0.0, -1.0), R, Material(MATERIAL_LAMBERTIAN, vec3(0.7, 0.3, 0.3), 0.0, 1.0)),
-    Sphere(vec3(R, 0.0, -1.0), R, Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.3, 1.5)),
-    Sphere(vec3(1.0, 0.3 * sin(u_time * 2.0 + 1.0), -1.0), 0.2, Material(MATERIAL_METAL, vec3(0.2, 0.6, 0.8), 1.0, 1.0))
+    Sphere(vec3(0.0, -100.5, 0.0), 100.0, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.1, 1.0)),
+    Sphere(vec3(-R, 0.0, 10.0*sin(u_time)), R, Material(MATERIAL_LAMBERTIAN, vec3(0.7, 0.3, 0.3), 0.0, 1.0)),
+    Sphere(vec3(0.0, 0.0, sin(u_time)), 0.1, Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.3, 1.5)),
+    Sphere(vec3(3.0 * sin(u_time), 2.0, 3.0 * cos(u_time)), 0.2, Material(MATERIAL_METAL, vec3(0.2, 0.6, 0.8), 0.0, 1.0))
   );
 
   vec3 unit_direction = normalize(ray.direction);
@@ -307,55 +315,41 @@ struct Camera {
   
   float vfov;
   vec3 look_from;
-  vec3 look_direction;
+  vec3 look_at;
   vec3 vup;
   vec3 u, v, w;
+
+  float defocus_angle;
+  float focus_dist;
+  vec3 defocus_disk_u;
+  vec3 defocus_disk_v;
 };
 
 void init(inout Camera camera) {
-  camera.aspect_ratio = u_resolution.y/u_resolution.x;
+  camera.aspect_ratio = float(u_resolution.y)/float(u_resolution.x);
   camera.samples_per_pixel = SAMPLES_PER_PIXEL;
 
-  camera.vfov = degrees_to_radians(45.0 + u_mousewheel);
+  camera.vfov = degrees_to_radians(30.0 + u_mousewheel);
   
-  camera.look_from = vec3(0, 0, 0);
-  camera.look_direction = vec3(0, 0, -2);
+  camera.look_from = vec3(3.0, 0.0, 0.0);
+  camera.look_at = vec3(0.0, 0.0, 0.0);
   camera.vup = vec3(0, 1, 0);
 
+  camera.defocus_angle = 5.0;
+  camera.focus_dist = 3.0;
 
-  camera.w = normalize(-camera.look_direction);
-  camera.u = normalize(cross(camera.vup, camera.w));
-  camera.v = cross(camera.w, camera.u);
-
-  
 
   //  Rotate camera with mouse pointer
 
-  camera.look_direction = rotate(normalize(camera.look_direction), -camera.v, 0.1 * u_pointerdiff.x);
-
-  // reset
-  camera.w = normalize(-camera.look_direction);
-  camera.u = normalize(cross(camera.vup, camera.w));
-  camera.v = cross(camera.w, camera.u);
-
-  camera.look_direction = rotate(normalize(camera.look_direction), -camera.u, 0.1 * u_pointerdiff.y);
-
-  // reset
-  camera.w = normalize(-camera.look_direction);
-  camera.u = normalize(cross(camera.vup, camera.w));
-  camera.v = cross(camera.w, camera.u);
-
-  // Move camera with keys
-  vec3 keydiff = 0.5 * camera.w * (-u_keymove.y) + camera.u * u_keymove.x;
-  camera.look_from += keydiff;
-  
-
+  camera.look_from = rotate(camera.look_from, -camera.vup, 0.1 * u_pointerdiff.x);
   camera.center = camera.look_from;
 
-  float focal_length = length(-camera.look_direction);
+  camera.w = normalize(camera.look_from - camera.look_at);
+  camera.u = normalize(cross(camera.vup, camera.w));
+  camera.v = cross(camera.w, camera.u);
 
   float h = tan(camera.vfov/2.0);
-  float viewport_height = 2.0 * h * focal_length;
+  float viewport_height = 2.0 * h * camera.focus_dist;
   float viewport_width = viewport_height / camera.aspect_ratio;
 
   vec3 viewport_u = viewport_width * camera.u;
@@ -364,8 +358,12 @@ void init(inout Camera camera) {
   camera.pixel_delta_u = viewport_u / u_resolution.x;
   camera.pixel_delta_v = viewport_v / u_resolution.y;
 
-  vec3 viewport_lower_left = camera.center - (focal_length * camera.w) - viewport_u/2.0 - viewport_v/2.0;
+  vec3 viewport_lower_left = camera.center - (camera.focus_dist * camera.w) - viewport_u/2.0 - viewport_v/2.0;
   camera.pixel_lower_left = viewport_lower_left + 0.5 * (camera.pixel_delta_u + camera.pixel_delta_v);
+
+  float defocus_radius = camera.focus_dist * tan(degrees_to_radians(camera.defocus_angle)/2.0);
+  camera.defocus_disk_u = camera.u * defocus_radius;
+  camera.defocus_disk_v = camera.v * defocus_radius;
 }
 
 vec3 pixel_sample_square(Camera camera) {
@@ -374,12 +372,18 @@ vec3 pixel_sample_square(Camera camera) {
   return (px * camera.pixel_delta_u) + (py * camera.pixel_delta_v);
 }
 
+vec3 defocus_disk_sample(Camera camera) {
+  vec3 p = random_in_unit_disk(vec2(gl_FragCoord.xy));
+  return camera.center + (p.x * camera.defocus_disk_u) + (p.y * camera.defocus_disk_v);
+}
+
 Ray get_ray(Camera camera, float x, float y) {
   vec3 pixel_center = camera.pixel_lower_left + (x * camera.pixel_delta_u) + (y * camera.pixel_delta_v);
   vec3 pixel_sample = pixel_center + pixel_sample_square(camera);
 
-  vec3 ray_direction = pixel_sample - camera.center;
-  return Ray(camera.center, ray_direction);
+  vec3 ray_origin = camera.defocus_angle <= 0.0 ? camera.center : defocus_disk_sample(camera);
+  vec3 ray_direction = pixel_sample - ray_origin;
+  return Ray(ray_origin, ray_direction);
 }
 
 
