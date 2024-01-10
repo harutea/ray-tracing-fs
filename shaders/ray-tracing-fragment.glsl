@@ -1,6 +1,7 @@
 uniform vec2 u_resolution;
 uniform float u_time;
-
+uniform float u_mousewheel;
+uniform vec2 u_mousepos;
 
 // Constants
 
@@ -310,11 +311,11 @@ void init(inout Camera camera) {
   camera.aspect_ratio = u_resolution.y/u_resolution.x;
   camera.samples_per_pixel = SAMPLES_PER_PIXEL;
 
-  camera.vfov = degrees_to_radians(20.0);
+  camera.vfov = degrees_to_radians(90.0 + u_mousewheel);
   camera.look_from = vec3(-2, 2, 1);
   camera.look_at = vec3(0, 0, -1);
   camera.vup = vec3(0, 1, 0);
-  camera.center = camera.look_from;
+  camera.center = camera.look_from + vec3(u_mousepos.x, 0, u_mousepos.y); // just for test
 
   float focal_length = length(camera.look_from - camera.look_at);
 
