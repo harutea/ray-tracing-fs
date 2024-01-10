@@ -1,14 +1,15 @@
 uniform vec2 u_resolution;
 uniform float u_time;
 uniform float u_mousewheel;
-uniform vec2 u_mousepos;
+uniform vec2 u_pointerdiff;
+uniform vec2 u_keymove;
 
 // Constants
 
 const float INFINITY = 10000000.0;
 const float PI = 3.14159265;
 const int MAX_DEPTH = 50;
-const int SAMPLES_PER_PIXEL = 100;
+const int SAMPLES_PER_PIXEL = 30;
 
 
 // Meterial Types
@@ -61,6 +62,10 @@ vec3 random_on_hemisphere(vec2 co, vec3 normal) {
 bool near_zero(vec3 v) {
   float s = 1e-8;
   return (abs(v.x) < s) && (abs(v.y) < s) && (abs(v.z) < s);
+}
+
+vec3 rotate(vec3 v, vec3 axis, float theta) {
+  return v * cos(theta) + cross(axis, v) * sin(theta) + axis * dot(axis, v) * (1.0-cos(theta));
 }
 
 float degrees_to_radians(float degrees) {
@@ -302,7 +307,7 @@ struct Camera {
   
   float vfov;
   vec3 look_from;
-  vec3 look_at;
+  vec3 look_direction;
   vec3 vup;
   vec3 u, v, w;
 };
@@ -311,21 +316,47 @@ void init(inout Camera camera) {
   camera.aspect_ratio = u_resolution.y/u_resolution.x;
   camera.samples_per_pixel = SAMPLES_PER_PIXEL;
 
-  camera.vfov = degrees_to_radians(90.0 + u_mousewheel);
-  camera.look_from = vec3(-2, 2, 1);
-  camera.look_at = vec3(0, 0, -1);
+  camera.vfov = degrees_to_radians(45.0 + u_mousewheel);
+  
+  camera.look_from = vec3(0, 0, 0);
+  camera.look_direction = vec3(0, 0, -2);
   camera.vup = vec3(0, 1, 0);
-  camera.center = camera.look_from + vec3(u_mousepos.x, 0, u_mousepos.y); // just for test
 
-  float focal_length = length(camera.look_from - camera.look_at);
+
+  camera.w = normalize(-camera.look_direction);
+  camera.u = normalize(cross(camera.vup, camera.w));
+  camera.v = cross(camera.w, camera.u);
+
+  
+
+  //  Rotate camera with mouse pointer
+
+  camera.look_direction = rotate(normalize(camera.look_direction), -camera.v, 0.1 * u_pointerdiff.x);
+
+  // reset
+  camera.w = normalize(-camera.look_direction);
+  camera.u = normalize(cross(camera.vup, camera.w));
+  camera.v = cross(camera.w, camera.u);
+
+  camera.look_direction = rotate(normalize(camera.look_direction), -camera.u, 0.1 * u_pointerdiff.y);
+
+  // reset
+  camera.w = normalize(-camera.look_direction);
+  camera.u = normalize(cross(camera.vup, camera.w));
+  camera.v = cross(camera.w, camera.u);
+
+  // Move camera with keys
+  vec3 keydiff = 0.5 * camera.w * (-u_keymove.y) + camera.u * u_keymove.x;
+  camera.look_from += keydiff;
+  
+
+  camera.center = camera.look_from;
+
+  float focal_length = length(-camera.look_direction);
 
   float h = tan(camera.vfov/2.0);
   float viewport_height = 2.0 * h * focal_length;
   float viewport_width = viewport_height / camera.aspect_ratio;
-
-  camera.w = normalize(camera.look_from - camera.look_at);
-  camera.u = normalize(cross(camera.vup, camera.w));
-  camera.v = cross(camera.w, camera.u);
 
   vec3 viewport_u = viewport_width * camera.u;
   vec3 viewport_v = viewport_height * camera.v;

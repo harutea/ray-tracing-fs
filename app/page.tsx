@@ -5,9 +5,11 @@ import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import fragmentShader from "../shaders/ray-tracing-fragment.glsl";
 import vertexShader from "../shaders/ray-tracing-vertex.glsl";
+import useKeyControl from "./hooks/use_key_control";
 
-const RayTracing = ({ mousewheel }) => {
+const RayTracing = ({ mouseWheel, pointerDiff }) => {
   const mesh = useRef();
+  const keyMove = useKeyControl();
 
   const uniforms = useMemo(
     () => ({
@@ -16,8 +18,9 @@ const RayTracing = ({ mousewheel }) => {
         value: 0.0,
       },
       u_resolution: { type: "v2", value: new THREE.Vector2() },
-      u_mousepos: { type: "v2", value: new THREE.Vector2() },
+      u_pointerdiff: { type: "v2", value: new THREE.Vector2() },
       u_mousewheel: { type: "f", value: 0.0 },
+      u_keymove: { type: "v2", value: new THREE.Vector2() },
     }),
     [],
   );
@@ -26,14 +29,22 @@ const RayTracing = ({ mousewheel }) => {
 
   useFrame((state) => {
     if (!mesh.current) return;
-    const { clock, mouse, wheel } = state;
+    const { clock } = state;
     mesh.current.material.uniforms.u_time.value = clock.getElapsedTime();
     const size = new THREE.Vector2();
     gl.getSize(size);
     mesh.current.material.uniforms.u_resolution.value.x = size.x;
     mesh.current.material.uniforms.u_resolution.value.y = size.y;
     mesh.current.material.uniforms.u_mousewheel.value =
-      mousewheel.current / 40.0;
+      mouseWheel.current / 40.0;
+    mesh.current.material.uniforms.u_pointerdiff.value.x +=
+      pointerDiff.x.current / 200.0;
+    mesh.current.material.uniforms.u_pointerdiff.value.y +=
+      pointerDiff.y.current / 400.0;
+    mesh.current.material.uniforms.u_keymove.value.x +=
+      0.1 * (Number(keyMove.right) - Number(keyMove.left));
+    mesh.current.material.uniforms.u_keymove.value.y +=
+      0.1 * (Number(keyMove.forward) - Number(keyMove.backward));
   });
 
   return (
@@ -49,16 +60,52 @@ const RayTracing = ({ mousewheel }) => {
 };
 
 const Home = () => {
-  const mousewheel = useRef(0.0);
+  const mouseWheel = useRef(0.0);
+
+  const pointerDown = useRef(false);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const diffX = useRef(0);
+  const diffY = useRef(0);
+
   const onWheel = (e) => {
+    mouseWheel.current += e.deltaY;
     console.log(e.deltaY);
-    mousewheel.current += e.deltaY;
   };
+
+  const onPointerDown = (e) => {
+    pointerDown.current = true;
+    startX.current = e.clientX;
+    startY.current = e.clientY;
+  };
+
+  const onPointerUp = (e) => {
+    pointerDown.current = false;
+    diffX.current = 0;
+    diffY.current = 0;
+  };
+
+  const onPointerMove = (e) => {
+    if (!pointerDown.current) return;
+
+    diffX.current = e.clientX - startX.current;
+    diffY.current = e.clientY - startY.current;
+    console.log(diffX.current, diffY.current);
+  };
+
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
       <div style={{ width: "800px", height: "450px" }}>
-        <Canvas onWheel={onWheel}>
-          <RayTracing mousewheel={mousewheel} />
+        <Canvas
+          onWheel={onWheel}
+          onPointerMove={onPointerMove}
+          onPointerDown={onPointerDown}
+          onPointerUp={onPointerUp}
+        >
+          <RayTracing
+            mouseWheel={mouseWheel}
+            pointerDiff={{ x: diffX, y: diffY }}
+          />
         </Canvas>
       </div>
     </div>
