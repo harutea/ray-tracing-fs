@@ -1,10 +1,16 @@
 uniform vec2 u_resolution;
 uniform float u_time;
 
+
+// Constants
+
 const float INFINITY = 10000000.0;
 const float PI = 3.14159265;
 const int MAX_DEPTH = 50;
 const int SAMPLES_PER_PIXEL = 100;
+
+
+// Meterial Types
 
 const int MATERIAL_LAMBERTIAN = 0;
 const int MATERIAL_METAL = 1;
@@ -99,6 +105,7 @@ vec3 ray_at(Ray ray, float t) {
 
 
 // Material
+
 struct Material {
   int type;
   vec3 albedo;
@@ -112,6 +119,7 @@ float reflectance(float cosine, float ref_index) {
   r0 = r0 * r0;
   return r0 + (1.0-r0) * pow((1.0 - cosine), 5.0);
 }
+
 
 // Intersection Record
 
@@ -225,11 +233,13 @@ bool scatter(Material material, Ray ray_in, IntersectionRecord record, inout vec
 vec3 ray_color(Ray ray) {
   int max_depth = MAX_DEPTH;
 
+  float R = cos(PI/4.0);
+
   // World
   Sphere[] sphere_list = Sphere[](
-    Sphere(vec3(0.0, 0.6 * sin(u_time * 2.0) + 0.6, -1.0), 0.5, Material(MATERIAL_LAMBERTIAN, vec3(0.7, 0.3, 0.3), 0.0, 1.0)),
     Sphere(vec3(0.0, -100.5, -1.0), 100.0, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.3, 1.0)),
-    Sphere(vec3(-1.0, 0.0, -1.0), -0.5, Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.3, 1.5)),
+    Sphere(vec3(-R, 0.0, -1.0), R, Material(MATERIAL_LAMBERTIAN, vec3(0.7, 0.3, 0.3), 0.0, 1.0)),
+    Sphere(vec3(R, 0.0, -1.0), R, Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.3, 1.5)),
     Sphere(vec3(1.0, 0.3 * sin(u_time * 2.0 + 1.0), -1.0), 0.2, Material(MATERIAL_METAL, vec3(0.2, 0.6, 0.8), 1.0, 1.0))
   );
 
@@ -288,24 +298,41 @@ struct Camera {
   vec3 pixel_lower_left;
   vec3 pixel_delta_u;
   vec3 pixel_delta_v;
+  
+  float vfov;
+  vec3 look_from;
+  vec3 look_at;
+  vec3 vup;
+  vec3 u, v, w;
 };
 
 void init(inout Camera camera) {
   camera.aspect_ratio = u_resolution.y/u_resolution.x;
   camera.samples_per_pixel = SAMPLES_PER_PIXEL;
 
-  float focal_length = 1.0;
-  float viewport_height = 2.0;
-  float viewport_width = viewport_height / camera.aspect_ratio;
-  camera.center = vec3(0.0, 0.0, 0.0);
+  camera.vfov = degrees_to_radians(20.0);
+  camera.look_from = vec3(-2, 2, 1);
+  camera.look_at = vec3(0, 0, -1);
+  camera.vup = vec3(0, 1, 0);
+  camera.center = camera.look_from;
 
-  vec3 viewport_u = vec3(viewport_width, 0.0, 0.0);
-  vec3 viewport_v = vec3(0.0, viewport_height, 0.0);
+  float focal_length = length(camera.look_from - camera.look_at);
+
+  float h = tan(camera.vfov/2.0);
+  float viewport_height = 2.0 * h * focal_length;
+  float viewport_width = viewport_height / camera.aspect_ratio;
+
+  camera.w = normalize(camera.look_from - camera.look_at);
+  camera.u = normalize(cross(camera.vup, camera.w));
+  camera.v = cross(camera.w, camera.u);
+
+  vec3 viewport_u = viewport_width * camera.u;
+  vec3 viewport_v = viewport_height * camera.v;
 
   camera.pixel_delta_u = viewport_u / u_resolution.x;
   camera.pixel_delta_v = viewport_v / u_resolution.y;
 
-  vec3 viewport_lower_left = camera.center - vec3(0.0, 0.0, focal_length) - viewport_u/2.0 - viewport_v/2.0;
+  vec3 viewport_lower_left = camera.center - (focal_length * camera.w) - viewport_u/2.0 - viewport_v/2.0;
   camera.pixel_lower_left = viewport_lower_left + 0.5 * (camera.pixel_delta_u + camera.pixel_delta_v);
 }
 
@@ -342,6 +369,8 @@ void main() {
   cx = linear_to_gamma(cx);
   cy = linear_to_gamma(cy);
   cz = linear_to_gamma(cz);
+
   pixel_color = vec3(cx, cy, cz);
+
   gl_FragColor = vec4(pixel_color, 1.0);
 }

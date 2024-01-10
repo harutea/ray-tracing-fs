@@ -47,10 +47,12 @@ const RayTracing = () => {
 
 const Home = () => {
   return (
-    <div style={{ width: "800px", height: "450px" }}>
-      <Canvas>
-        <RayTracing />
-      </Canvas>
+    <div style={{ display: "flex", justifyContent: "center" }}>
+      <div style={{ width: "800px", height: "450px" }}>
+        <Canvas>
+          <RayTracing />
+        </Canvas>
+      </div>
     </div>
   );
 };
