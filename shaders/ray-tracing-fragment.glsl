@@ -10,7 +10,7 @@ const float INFINITY = 10000000.0;
 const float PI = 3.14159265;
 const int MAX_DEPTH = 50;
 const int SAMPLES_PER_PIXEL = 30;
-const vec3 GROUND_COLOR = vec3(0.6, 0.6, 0.8);
+const vec3 GROUND_COLOR = vec3(0.5, 0.5, 0.9);
 const float LIGHT_SOURCE_RADIUS = 0.2;
 
 // Meterial Types
@@ -192,21 +192,21 @@ bool ray_sphere_intersection(Ray ray, Interval ray_t, Sphere s, inout Intersecti
 }
 
 struct Triangle {
+  vec3 p0;
   vec3 p1;
   vec3 p2;
-  vec3 p3;
   Material material;
 };
 
 bool ray_triangle_intersection(Ray ray, Interval ray_t, Triangle tri, inout IntersectionRecord record) {
   
-  const epsilon = 0.000001;
+  const float epsilon = 0.001;
 
 
   // compute the triangle normal
 
-  vec3 p0p1 = p1 - p0;
-  vec3 p0p2 = p2 - p0;
+  vec3 p0p1 = tri.p1 - tri.p0;
+  vec3 p0p2 = tri.p2 - tri.p0;
   vec3 normal = cross(p0p1, p0p2);
   
 
@@ -219,11 +219,11 @@ bool ray_triangle_intersection(Ray ray, Interval ray_t, Triangle tri, inout Inte
 
   // find p (the intersection point)
 
-  float d = dot(-n, p0);
+  float d = dot(-normal, tri.p0);
 
-  float t = -(dot(n, ray.origin) + d) / dot_n_raydir;
+  float t = -(dot(normal, ray.origin) + d) / dot_n_raydir;
 
-  if ( t < 0 )
+  if (!interval_surrounds(ray_t, t))
     return false;
 
   vec3 p = ray_at(ray, t);
@@ -233,16 +233,16 @@ bool ray_triangle_intersection(Ray ray, Interval ray_t, Triangle tri, inout Inte
 
   vec3 c;
 
-  c = cross(v1-v0, p-v0);
-  if (dot(normal, c) < 0)
+  c = cross(tri.p1-tri.p0, p-tri.p0);
+  if (dot(normal, c) < 0.0)
     return false;
   
-  c = cross(v2-v1, p-v1);
-  if (dot(normal, c) < 0)
+  c = cross(tri.p2-tri.p1, p-tri.p1);
+  if (dot(normal, c) < 0.0)
     return false;
   
-  c = cross(v0-v2, p-v2);
-  if (dot(normal, c) < 0)
+  c = cross(tri.p0-tri.p2, p-tri.p2);
+  if (dot(normal, c) < 0.0)
     return false;
   
 
@@ -255,16 +255,47 @@ bool ray_triangle_intersection(Ray ray, Interval ray_t, Triangle tri, inout Inte
 }
 
 struct Tetrahedron {
+  vec3 p0;
   vec3 p1;
   vec3 p2;
   vec3 p3;
-  vec3 p4;
   Material material;
-}
+};
 
 bool ray_tetrahedron_intersection(Ray ray, Interval ray_t, Tetrahedron tet, inout IntersectionRecord record) {
-  
-  vec3 outward_normal = vec3(0, 0, 0);
+  float closest = INFINITY;
+  IntersectionRecord rec_temp;
+
+  bool intersect_something = false;
+
+  if(ray_triangle_intersection(ray, Interval(0.001, closest), Triangle(tet.p2, tet.p1, tet.p0, tet.material), rec_temp)) {
+    intersect_something = true;
+    closest = rec_temp.t;
+  }
+  if(ray_triangle_intersection(ray, Interval(0.001, closest), Triangle(tet.p3, tet.p2, tet.p1, tet.material), rec_temp)) {
+    intersect_something = true;
+    closest = rec_temp.t;
+  }
+  if(ray_triangle_intersection(ray, Interval(0.001, closest), Triangle(tet.p0, tet.p3, tet.p2, tet.material), rec_temp)) {
+    intersect_something = true;
+    closest = rec_temp.t;
+  }
+  if(ray_triangle_intersection(ray, Interval(0.001, closest), Triangle(tet.p1, tet.p0, tet.p3, tet.material), rec_temp)) {
+    intersect_something = true;
+    closest = rec_temp.t;
+  }
+
+
+  if(!intersect_something)
+    return false;
+
+  if (!interval_surrounds(ray_t, closest))
+    return false;
+
+  record.t = rec_temp.t;
+  record.pos = rec_temp.pos;
+  record.material = tet.material;
+  vec3 outward_normal = rec_temp.normal;
   set_intersected_face_normal(record, ray, outward_normal);
   return true;
 }
@@ -358,25 +389,25 @@ vec3 ray_color(Ray ray) {
   int max_depth = MAX_DEPTH;
 
   // World
-  vec3 light_pos = vec3(4.0 * sin(u_time * 0.5), 3.0, 4.0 * cos(u_time * 0.5));
+  vec3 light_pos = vec3(3.3 * sin(u_time * 0.5), 3.3, 3.3 * cos(u_time * 0.5));
   
   Sphere[] sphere_list = Sphere[](
     Sphere(vec3(0.0, -100.2, 0.0), 100.0, Material(MATERIAL_LAMBERTIAN, GROUND_COLOR, 0.1, 1.0)),
     Sphere(light_pos, LIGHT_SOURCE_RADIUS, Material(MATERIAL_LIGHT, vec3(0.2, 0.6, 0.8), 0.0, 1.0)),
-    Sphere(vec3(-1.2, 0.5, -1.2), 0.7, Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.0, 1.0)),
-    Sphere(vec3(-2.2, 0.0, -2.0), 0.2, Material(MATERIAL_LAMBERTIAN, vec3(1.0, 0.8, 0.8), 0.0, 1.0)),
-    Sphere(vec3(0.1, 0.0, 1.6), 0.2, Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.3, 1.5)),
-    Sphere(vec3(2.2, 0.0, -1.3), 0.2, Material(MATERIAL_LAMBERTIAN, vec3(0.5, 0.5, 1.0), 0.1, 1.5)),
-    Sphere(vec3(1.7, 0.0, -0.3), 0.2, Material(MATERIAL_METAL, vec3(1.0, 0.5, 0.5), 0.4, 1.5)),
-    Sphere(vec3(2.2, 0.0, 2.3), 0.2, Material(MATERIAL_METAL, vec3(0.3, 0.8, 0.8), 0.2, 1.5))
+    Sphere(vec3(-0.8, 0.3, -1.2), 0.5, Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.0, 1.5)),
+    Sphere(vec3(-0.9, 0.0, -0.4), 0.2, Material(MATERIAL_LAMBERTIAN, vec3(1.0, 0.8, 0.8), 0.0, 1.0)), // pink
+    Sphere(vec3(0.8, 0.0, -0.8), 0.2, Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.3, 1.5)),
+    Sphere(vec3(0.55, 0.0, -0.1), 0.2, Material(MATERIAL_LAMBERTIAN, vec3(1.0, 0.2, 0.7), 0.1, 1.5)), // red
+    Sphere(vec3(-0.6, 0.0, 0.3), 0.2, Material(MATERIAL_METAL, vec3(1.0, 1.0, 0.4), 0.1, 1.5)), // yellow
+    Sphere(vec3(0.3, 0.0, 0.5), 0.2, Material(MATERIAL_METAL, vec3(0.5, 1.0, 0.6), 0.2, 1.5)) // green
   );
-
+  
   Tetrahedron[] tet_list = Tetrahedron[](
-    Tetrahedron(vec3(0.0, 0.5 * sqrt(3), 0.25 * 1.0 / sqrt(3)),
-                vec3(0.5, 0.0, 0.0),
-                vec3(-0.5, 0.0, 0.0),
-                vec3(0.0, 0.0, 1.0 - 0.25 * 1.0 / sqrt(3)),
-                Material(MATERIAL_DIELECTRIC, vec3(0.8, 0.8, 0.8), 0.0, 1.5)
+    Tetrahedron(vec3(0.0, -0.2, 0.5 * 1.0 / sqrt(3.0) - 0.3),
+                vec3(0.5, 0.5 * sqrt(3.0) - 0.2, -0.3),
+                vec3(-0.5, 0.5 * sqrt(3.0) - 0.2, -0.3),
+                vec3(0.0, 0.5 * sqrt(3.0) - 0.2, 0.5 * sqrt(3.0) - 0.3),
+                Material(MATERIAL_METAL, vec3(0.8, 0.8, 0.8), 0.0, 1.5)
                 )
   );
 
@@ -401,8 +432,14 @@ vec3 ray_color(Ray ray) {
       }
     }
 
-    // Test Ray-Triangle Intersection
-    
+    // Test Ray-Tetrahedron Intersection
+    for (int i=0; i<tet_list.length(); i++) {
+      if(ray_tetrahedron_intersection(ray_curr, Interval(0.001, closest), tet_list[i], rec_temp)) {
+        intersect_something = true;
+        closest = rec_temp.t;
+        record = rec_temp;
+      }
+    }
     
     if(!intersect_something)
       break;
@@ -456,12 +493,12 @@ void init(inout Camera camera) {
 
   camera.vfov = degrees_to_radians(20.0 + 0.5 * u_mousewheel);
   
-  camera.look_from = vec3(9.0, 2.0, 2.0);
+  camera.look_from = vec3(9.0, 1.6, 2.0);
   camera.look_at = vec3(0.0, 0.0, 0.0);
   camera.vup = vec3(0, 1, 0);
 
   camera.defocus_angle = 1.0;
-  camera.focus_dist = 9.0 + 2.0 * u_keymove.y;
+  camera.focus_dist = 9.0 + 2.4 * u_keymove.y;
 
 
   //  Rotate camera with mouse pointer
