@@ -17,7 +17,7 @@ $ run npm dev
 
 ## Camera Contorls
 - Mouse Wheel : Change the vertical field of view
-- Drag : Change the horizontal position of Camera
+- Drag : Change the horizontal position of camera
 - Key 'W' and 'S' : Change the focal length
 
 ## Shaders
