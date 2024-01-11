@@ -1,6 +1,6 @@
 # ray-tracing-fs
 
-Ray Tracing in Fragment Shader
+Ray Tracing in Fragment Shader using React Three Fiber
 
 ![preview](/resources/ray-tracing-fs-preview.png)
 
@@ -14,6 +14,11 @@ Ray Tracing in Fragment Shader
 $ npm i
 $ run npm dev
 ```
+
+## Camera Contorls
+- Mouse Wheel : Change the vertical field of view
+- Drag : Change the horizontal position of Camera
+- Key 'W' and 'S' : Change the focal length
 
 ## Shaders
 The shader files are in `/shaders`.
