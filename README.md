@@ -1,6 +1,6 @@
 # ray-tracing-fs
 
-Ray Tracing in Fragment Shader using React Three Fiber
+Ray Tracing in Fragment Shader using React Three Fiber. It uses ShaderMaterial in Three.js.
 
 ![preview](/resources/ray-tracing-fs-preview.png)
 
