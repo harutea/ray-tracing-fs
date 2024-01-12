@@ -2,6 +2,8 @@
 
 Ray Tracing in Fragment Shader using React Three Fiber. It uses ShaderMaterial in Three.js.
 
+Based on [Ray Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
+
 ![preview](/resources/ray-tracing-fs-preview.png)
 
 ## Dependency
