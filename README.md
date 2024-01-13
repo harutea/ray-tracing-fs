@@ -17,7 +17,7 @@ $ npm i
 $ run npm dev
 ```
 
-## Camera Contorls
+## Camera Controls
 - Mouse Wheel : Change the vertical field of view
 - Drag : Change the horizontal position of camera
 - Key 'W' and 'S' : Change the focal length
