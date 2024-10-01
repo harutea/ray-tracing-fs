@@ -1,6 +1,6 @@
 # ray-tracing-fs
 
-Ray Tracing(Path Tracing) in Fragment Shader using React Three Fiber. It utilizes ShaderMaterial in Three.js.
+Ray Tracing (Path Tracing) in Fragment Shader using React Three Fiber, utilizing ShaderMaterial from Three.js.
 
 Based on [Ray Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
 
